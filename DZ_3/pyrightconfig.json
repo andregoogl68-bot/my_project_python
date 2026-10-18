@@ -1,0 +1,8 @@
+{
+    "include": ["."],
+    "exclude": ["**/__pycache__", "**/*.bak", "**/htmlcov"],
+    "pythonVersion": "3.14",
+    "typeCheckingMode": "basic",
+    "reportMissingImports": "warning",
+    "reportUndefinedVariable": "warning"
+}

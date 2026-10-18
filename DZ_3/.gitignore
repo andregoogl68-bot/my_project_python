@@ -1,0 +1,32 @@
+# Байт-код Python
+__pycache__/
+*.py[cod]
+*.pyo
+.pytest_cache/
+*.bak
+htmlcov/
+.venv/
+
+
+# Виртуальные окружения
+.venv/
+venv/
+env/
+
+# Настройки IDE
+.idea/
+.vscode/
+*.swp
+*.swo
+
+# Резервные копии и логи
+*.bak
+*.log
+
+# Рабочие данные телефонного справочника
+# *.txt
+# *.txt.bak
+
+# Системный мусор
+.DS_Store
+Thumbs.db
