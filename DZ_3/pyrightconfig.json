@@ -1,6 +1,6 @@
 {
-    "include": ["."],
-    "exclude": ["**/__pycache__", "**/*.bak", "**/htmlcov"],
+     "include": ["."],
+    "exclude": ["**/__pycache__", "**/*.bak", "**/htmlcov", "**/.pytest_cache"],
     "pythonVersion": "3.14",
     "typeCheckingMode": "basic",
     "reportMissingImports": "warning",

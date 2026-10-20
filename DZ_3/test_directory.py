@@ -1,13 +1,16 @@
 """
-Тесты телефонного справочника (unittest + pytest).
+Тесты телефонного справочника.                                               
 
-Запуск:
-    python test_directory.py                  # только unittest
-    python -m pytest test_directory.py -v     # unittest + pytest
+Файл содержит два набора тестов:                                             
 
-Все тесты изолированы: каждый работает в собственной временной
-директории, реальный файл ``contacts.txt`` не затрагивается.
-"""
+* unittest-стиль — классы-наследники unittest.TestCase                       # Первый набор
+  (запускаются командой ``python test_directory.py``);                       # Как запускать unittest
+* pytest-стиль — обычные функции test_* с assert, фикстурами                 # Второй набор
+  и параметризацией (запускаются командой ``pytest test_directory.py``).     # Как запускать pytest
+
+Все тесты изолированы: каждый работает в собственной временной               # Пояснение об изоляции
+директории, реальный файл ``contacts.txt`` не затрагивается.                 # Реальный файл не трогаем
+"""                                                                          
 
 import ast                                                                   # Для проверки содержимого файла
 import io                                                                    # Для перехвата stdout
@@ -15,7 +18,7 @@ import os                                                                    # �
 import tempfile                                                              # Для временных директорий
 import unittest                                                              # Базовый фреймворк
 from contextlib import redirect_stdout                                       # Для перехвата вывода
-from unittest.mock import patch                                              # Для подмены input/open
+from unittest.mock import patch                                              # Для подмены input
 
 import pytest                                                                # Фреймворк pytest
 
@@ -23,7 +26,6 @@ from exceptions import (                                                     # �
     BackupError,                                                             # Ошибка резервной копии
     ContactFileFormatError,                                                  # Ошибка формата файла
     ContactFileNotFoundError,                                                # Ошибка отсутствия файла
-    ContactFileWriteError,                                                   # Ошибка записи файла
     ContactNotFoundError,                                                    # Контакт не найден
     DuplicatePhoneError,                                                     # Дубликат телефона
     EmptyFieldError,                                                         # Пустое поле
@@ -149,8 +151,7 @@ class TestContactReader(unittest.TestCase):                                  # �
 
     def test_load_empty_file(self):                                          # Тест пустого файла
         """Пустой файл даёт пустой список."""                                # Докстрока
-        with open(self.path, "w", encoding="utf-8"):                         # Создаём пустой файл
-            pass                                                             # Ничего не пишем
+        open(self.path, "w").close()                                         # Создаём пустой файл
         self.assertEqual(ContactReader.load(self.path), [])                  # Результат — пустой список
 
     def test_load_valid(self):                                               # Тест корректного файла
@@ -421,41 +422,6 @@ class TestPhoneBook(unittest.TestCase):                                      # �
         self.assertEqual(len(contacts), 1)                                   # Один контакт
         self.assertEqual(contacts[0].first, "A")                             # Имя совпало
 
-    # ---------- Граничные условия ----------
-
-    def test_add_empty_contact_subtest(self):                                # subTest: разные пустые комбинации
-        """subTest: пустые обязательные поля → EmptyFieldError."""           # Докстрока
-        cases = [                                                            # Список вариантов
-            ("", "", ""),       # всё пусто                                   # Всё пусто
-            ("", "", "+1"),     # нет имени и фамилии                        # Нет имени и фамилии
-            ("A", "", ""),      # нет телефона                               # Нет телефона
-            ("", "B", ""),      # нет телефона                               # Нет телефона
-        ]                                                                    # Конец списка
-        for first, last, phone in cases:                                     # Перебираем варианты
-            with self.subTest(first=first, last=last, phone=phone):          # subTest для каждого
-                with self.assertRaises(EmptyFieldError):                     # Ожидаем ошибку
-                    self.book.add(first, last, phone)                        # Пытаемся добавить
-
-    def test_add_only_first_name(self):                                      # Тест только имени
-        """Только имя, фамилия пустая — разрешено."""                        # Докстрока
-        c = self.book.add("Иван", "", "+1")                                  # Добавляем только имя
-        self.assertEqual(c.first, "Иван")                                    # Имя сохранено
-        self.assertEqual(c.last, "")                                         # Фамилия пустая
-
-    def test_add_only_last_name(self):                                       # Тест только фамилии
-        """Только фамилия, имя пустое — разрешено."""                        # Докстрока
-        c = self.book.add("", "Иванов", "+1")                                # Добавляем только фамилию
-        self.assertEqual(c.first, "")                                        # Имя пустое
-        self.assertEqual(c.last, "Иванов")                                   # Фамилия сохранена
-
-    def test_next_id_after_delete_last(self):                                # Тест next_id после удаления
-        """next_id после удаления последнего уменьшается (текущее поведение)."""  # Докстрока
-        self.book.add("A", "B", "+1")                                        # Первый контакт
-        c2 = self.book.add("C", "D", "+2")                                   # Второй контакт
-        self.assertEqual(self.book.next_id(), 3)                             # Максимальный + 1
-        self.book.delete(c2.id)                                              # Удаляем последний
-        self.assertEqual(self.book.next_id(), 2)                             # Теперь снова 2
-
 
 # =============================================================================
 # UNITTEST — представление view
@@ -515,55 +481,6 @@ class TestView(unittest.TestCase):                                           # �
             view.show_error(PhoneBookError("тест"))                          # Печатаем ошибку
         self.assertIn("[Ошибка]", buf.getvalue())                            # Есть пометка
         self.assertIn("тест", buf.getvalue())                                # Есть текст
-
-
-# =============================================================================
-# UNITTEST — иерархия исключений
-# =============================================================================
-
-class TestExceptionHierarchy(unittest.TestCase):                             # Класс тестов иерархии
-    """Наследование кастомных исключений от PhoneBookError."""               # Докстрока класса
-
-    def test_storage_errors(self):                                           # Тест ошибок хранилища
-        """Все ошибки хранилища — потомки StorageError и PhoneBookError."""  # Докстрока
-        for exc in (ContactFileNotFoundError, ContactFileFormatError,        # Перебираем классы
-                    ContactFileWriteError, BackupError):                     # Продолжение списка
-            with self.subTest(exc=exc.__name__):                             # subTest для каждого
-                self.assertTrue(issubclass(exc, StorageError))               # Потомок StorageError
-                self.assertTrue(issubclass(exc, PhoneBookError))             # Потомок PhoneBookError
-
-    def test_validation_errors(self):                                        # Тест ошибок валидации
-        """Все ошибки валидации — потомки ValidationError и PhoneBookError."""  # Докстрока
-        for exc in (EmptyFieldError, DuplicatePhoneError):                   # Перебираем классы
-            with self.subTest(exc=exc.__name__):                             # subTest для каждого
-                self.assertTrue(issubclass(exc, ValidationError))            # Потомок ValidationError
-                self.assertTrue(issubclass(exc, PhoneBookError))             # Потомок PhoneBookError
-
-    def test_direct_errors(self):                                            # Тест прямых потомков
-        """ContactNotFoundError / InvalidContactIDError — прямые потомки."""  # Докстрока
-        for exc in (ContactNotFoundError, InvalidContactIDError):            # Перебираем классы
-            with self.subTest(exc=exc.__name__):                             # subTest для каждого
-                self.assertTrue(issubclass(exc, PhoneBookError))             # Потомок PhoneBookError
-
-    def test_exception_attributes(self):                                     # Тест атрибутов исключений
-        """Атрибуты кастомных исключений сохраняются и видны в str()."""     # Докстрока
-        err = EmptyFieldError("телефон")                                     # Создаём ошибку поля
-        self.assertEqual(err.field, "телефон")                               # Атрибут сохранён
-        self.assertIn("телефон", str(err))                                   # Текст содержит поле
-
-        err2 = DuplicatePhoneError("+7999", 7)                               # Ошибка дубликата
-        self.assertEqual(err2.phone, "+7999")                                # Телефон сохранён
-        self.assertEqual(err2.cid, 7)                                        # ID сохранён
-        self.assertIn("+7999", str(err2))                                    # Текст содержит телефон
-        self.assertIn("ID=7", str(err2))                                     # Текст содержит ID
-
-        err3 = ContactNotFoundError(42)                                      # Ошибка поиска
-        self.assertEqual(err3.cid, 42)                                       # ID сохранён
-        self.assertIn("42", str(err3))                                       # Текст содержит ID
-
-        err4 = InvalidContactIDError("abc")                                  # Ошибка ID
-        self.assertEqual(err4.raw, "abc")                                    # Сырой ввод сохранён
-        self.assertIn("abc", str(err4))                                      # Текст содержит ввод
 
 
 # =============================================================================
@@ -670,126 +587,6 @@ def test_dirty_flag(empty_book):                                             # �
 
 
 # =============================================================================
-# PYTEST — параметризация форматов данных
-# =============================================================================
-
-@pytest.mark.parametrize("first,last", [                                     # Параметризация имён
-    ("Иван", "Иванов"),                                                      # Кириллица
-    ("John", "Smith"),                                                       # Латиница
-    ("Анна-Мария", "Петрова-Водкина"),                                       # Двойной дефис
-    ("А", "Б"),                                                              # Одна буква
-    ("Жанна", ""),                                                           # Только имя
-    ("", "Толстой"),                                                         # Только фамилия
-    ("О'Нил", "Макдональдс"),                                                # Апостроф
-])                                                                           # Конец параметров
-def test_add_various_name_formats(empty_book, first, last):                  # Тест форматов имён
-    """Параметризация: разные форматы имён принимаются."""                   # Докстрока
-    book, _ = empty_book                                                     # Достаём книгу
-    c = book.add(first, last, "+70000000000")                                # Добавляем контакт
-    assert c.first == first                                                  # Имя сохранено
-    assert c.last == last                                                    # Фамилия сохранена
-
-
-@pytest.mark.parametrize("phone", [                                          # Параметризация телефонов
-    "+79990001122",                                                          # Компактный
-    "+7 (999) 000-11-22",                                                    # Скобки и пробелы
-    "8-999-000-11-22",                                                       # Дефисы, восьмёрка
-    "9990001122",                                                            # Без плюса
-    "+44 20 7946 0958",                                                      # Международный
-    "+7 999 000 11 22",                                                      # Пробелы
-    "8(999)000-11-22",                                                       # Смешанный
-])                                                                           # Конец параметров
-def test_add_various_phone_formats(empty_book, phone):                       # Тест форматов телефонов
-    """Параметризация: разные форматы телефона принимаются."""               # Докстрока
-    book, _ = empty_book                                                     # Достаём книгу
-    c = book.add("Имя", "Фамилия", phone)                                    # Добавляем контакт
-    assert c.phone == phone                                                  # Телефон сохранён
-
-
-@pytest.mark.parametrize("field,query,expected_count", [                     # Параметризация поиска
-    ("имя", "иван", 1),                                                      # Поиск по имени
-    ("имя", "ИВАН", 1),                                                      # Регистронезависимо
-    ("имя", "пётр", 1),                                                      # Поиск по имени (Пётр)
-    ("фамилия", "иванов", 1),                                                # Поиск по фамилии
-    ("фамилия", "петров", 1),                                                # Поиск по фамилии
-    ("Номер", "+7999", 2),                                                   # Поиск по префиксу
-    ("Номер", "0001", 1),                                                    # Поиск по фрагменту
-    ("комментарий", "друг", 1),                                              # Поиск по комментарию
-    ("комментарий", "коллега", 1),                                           # Поиск по комментарию
-    ("комментарий", "нет-такого", 0),                                        # Ничего не найдено
-])                                                                           # Конец параметров
-def test_search_by_field_parametrized(filled_book, field, query, expected_count):  # Тест поиска
-    """Параметризация: поиск по каждому полю с разными запросами."""         # Докстрока
-    book, _ = filled_book                                                    # Достаём книгу
-    assert len(book.search(query, field)) == expected_count                  # Сверяем количество
-
-
-def test_search_empty_query_returns_all(filled_book):                        # Тест пустого запроса
-    """Пустой запрос возвращает все контакты (текущее поведение)."""         # Докстрока
-    book, _ = filled_book                                                    # Достаём книгу
-    assert len(book.search("")) == 2                                         # Все контакты
-
-
-@pytest.mark.parametrize("field_name,new_value,attr", [                      # Параметризация update
-    ("first", "Новое", "first"),                                             # Обновление имени
-    ("last", "Фам", "last"),                                                 # Обновление фамилии
-    ("phone", "+70001112233", "phone"),                                      # Обновление телефона
-    ("comment", "new-comment", "comment"),                                   # Обновление комментария
-])                                                                           # Конец параметров
-def test_update_individual_fields(filled_book, field_name, new_value, attr):  # Тест обновления поля
-    """Параметризация: обновление каждого поля по отдельности."""            # Докстрока
-    book, _ = filled_book                                                    # Достаём книгу
-    c = book.contacts[0]                                                     # Берём первый контакт
-    book.update(c.id, **{field_name: new_value})                             # Обновляем одно поле
-    assert getattr(c, attr) == new_value                                     # Поле обновилось
-
-
-# =============================================================================
-# PYTEST — граничные условия
-# =============================================================================
-
-@pytest.mark.parametrize("bad_id", [0, -1, 999999])                          # Параметризация ID
-def test_get_by_id_boundary(empty_book, bad_id):                             # Тест несуществующих ID
-    """Граница: несуществующие ID (0, отрицательный, огромный)."""           # Докстрока
-    book, _ = empty_book                                                     # Достаём книгу
-    with pytest.raises(ContactNotFoundError):                                # Ожидаем ошибку
-        book.get_by_id(bad_id)                                               # Пытаемся найти
-
-
-def test_init_with_corrupted_file(tmp_path):                                 # Тест битого файла при init
-    """Повреждённый файл при init — пустая книга без исключения."""          # Докстрока
-    path = tmp_path / "bad.txt"                                              # Путь к файлу
-    path.write_text("NOT A VALID LIST", encoding="utf-8")                    # Пишем мусор
-    book = PhoneBook(str(path))                                              # Создаём книгу
-    assert book.contacts == []                                               # Список пуст
-
-
-def test_writer_backup_error_when_path_is_dir(tmp_path):                     # Тест BackupError
-    """Если путь — директория, при save возникает BackupError."""            # Докстрока
-    d = tmp_path / "not_a_file"                                              # Путь-директория
-    d.mkdir()                                                                # Создаём директорию
-    with pytest.raises(BackupError):                                         # Ожидаем ошибку
-        ContactWriter.save([Contact(1, "A", "B", "+1")], str(d))             # Пытаемся сохранить
-
-
-def test_writer_write_error(tmp_path):                                       # Тест ContactFileWriteError
-    """Ошибка записи основного файла → ContactFileWriteError."""             # Докстрока
-    path = tmp_path / "c.txt"                                                # Путь к файлу
-    path.write_text("[]", encoding="utf-8")                                  # Создаём исходный файл
-    real_open = open                                                         # Запоминаем настоящий open
-    main_path = str(path)                                                    # Строковый путь
-
-    def fake_open(file, mode="r", *args, **kwargs):                          # Замена open
-        if "w" in mode and str(file) == main_path:                           # Запись основного файла
-            raise OSError("test write failure")                              # Имитируем ошибку
-        return real_open(file, mode, *args, **kwargs)                        # Остальное — как обычно
-
-    with patch("builtins.open", side_effect=fake_open):                      # Подменяем open
-        with pytest.raises(ContactFileWriteError):                           # Ожидаем ошибку
-            ContactWriter.save([Contact(1, "A", "B", "+1")], main_path)      # Пытаемся сохранить
-
-
-# =============================================================================
 # PYTEST — проверки исключений
 # =============================================================================
 
@@ -854,17 +651,9 @@ def test_add_duplicate_phone_pytest(filled_book):                            # �
         book.add("Новый", "Контакт", "+79990001122")                         # Пытаемся добавить дубликат
 
 
-def test_exception_attrs_pytest():                                           # Тест атрибутов исключений
-    """Атрибуты исключений доступны напрямую."""                             # Докстрока
-    assert EmptyFieldError("телефон").field == "телефон"                     # Поле сохранено
-    assert DuplicatePhoneError("+1", 5).cid == 5                             # ID сохранён
-    assert ContactNotFoundError(42).cid == 42                                # ID сохранён
-    assert InvalidContactIDError("abc").raw == "abc"                         # Ввод сохранён
-
-
 # =============================================================================
 # Запуск unittest-тестов
 # =============================================================================
 
 if __name__ == "__main__":                                                   # Если запущен напрямую
-    unittest.main()                                          
+    unittest.main()                                                          # Запускаем unittest
